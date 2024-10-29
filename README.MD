@@ -1,5 +1,6 @@
 # Armature inverter
 ## What it does
+Armature inverter is built for blender 3.6.
 Armature inverter adjusts a mesh so that it's post pose shape matches it's base shape.
 
 ## How to use
