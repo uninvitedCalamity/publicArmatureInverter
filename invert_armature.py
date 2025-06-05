@@ -215,9 +215,9 @@ class invert_armature(bpy.types.Operator):
                     baseStep = context.scene.invert_tool.step_size
                     progStep = baseStep
                     while progStep > context.scene.invert_tool.min_step_size:
-                        interpolate3(originalObject.name, copyObject.name, modifier.name, progStep)
+                        interpolate3(originalObject.name, copyObject.name, modifier.object.name, progStep)
                         progStep /= 2
-                    interpolate3(originalObject.name, copyObject.name, modifier.name, context.scene.invert_tool.min_step_size)       
+                    interpolate3(originalObject.name, copyObject.name, modifier.object.name, context.scene.invert_tool.min_step_size)       
             return{'FINISHED'}
         return{'FINISHED'}
     
