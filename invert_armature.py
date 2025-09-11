@@ -113,7 +113,8 @@ def get_evaluated(originalObject):
     dg = bpy.context.evaluated_depsgraph_get()
     evaled = originalObject.evaluated_get(dg)
     mesh_eval = evaled.to_mesh().vertices
-    return mesh_eval    
+    return mesh_eval  
+
 
 class invert_armature(bpy.types.Operator):
     """Armature inverter"""
@@ -121,13 +122,23 @@ class invert_armature(bpy.types.Operator):
     bl_label = "Invert active armature"
     bl_options = {'REGISTER', 'UNDO'}
 
-    def execute(self, context):       
+    def execute(self, context):   
+        was_original:bool = False
         def Info(string):
             self.report({"INFO"},str(string))
 
         def breakLog():
             Info("--------------------------------")
             Info("--------------------------------")
+
+        def JoinAsShape(target1, target2):
+            tarOb1 = bpy.data.objects.get(target1)
+            tarOb2 = bpy.data.objects.get(target2)
+            bpy.ops.object.select_all(action='DESELECT')
+            tarOb1.select_set(True)
+            tarOb2.select_set(True)
+            bpy.context.view_layer.objects.active = tarOb1
+            bpy.ops.object.join_shapes()
 
         #Converts point's local position to bone in pose to local point relative to bone at rest
         def calculate(boneDictionary, groupName, weight, modifier):
@@ -164,20 +175,88 @@ class invert_armature(bpy.types.Operator):
         
         
         if(len(originalVertices) >= 1):
+            context.view_layer.objects.active = originalObject
+            bpy.ops.object.duplicate_move(
+                OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, 
+                TRANSFORM_OT_translate={
+                    "value":(0, 0, 0), 
+                    "orient_type":'GLOBAL', 
+                    "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), 
+                    "orient_matrix_type":'GLOBAL', 
+                    "constraint_axis":(False, False, False), 
+                    "mirror":True, 
+                    "use_proportional_edit":False, 
+                    "proportional_edit_falloff":'SMOOTH', 
+                    "proportional_size":1, 
+                    "use_proportional_connected":False, 
+                    "use_proportional_projected":False, 
+                    "snap":False, 
+                    "snap_target":'CLOSEST', 
+                    "snap_point":(0, 0, 0), 
+                    "snap_align":False, 
+                    "snap_normal":(0, 0, 0), 
+                    "gpencil_strokes":False, 
+                    "cursor_transform":False, 
+                    "texture_space":False, 
+                    "remove_on_cancel":False, 
+                    "release_confirm":False, 
+                    "use_accurate":False}
+                )
+            modifyObject = context.view_layer.objects.active
+            modifyObject.name= originalObject.name + "Modify"
+            Info(modifyObject.name)
+            if(modifyObject.data.shape_keys != None):
+                shapes_length = len(modifyObject.data.shape_keys.key_blocks)
+                Info(shapes_length - 1)
+                shapes_iterator = shapes_length - 1
+
+                if shapes_length > 0:
+                    while shapes_iterator >= 0:
+                        modifyObject.data.shape_keys.key_blocks[shapes_iterator].lock_shape = False
+                        shapes_iterator -= 1
+                    modifyObject.shape_key_clear()
+
             copyObject = secondaryObject
             if secondaryObject == originalObject:
-                bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(0, 0, 0), "orient_type":'GLOBAL', "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, False), "mirror":True, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "release_confirm":False, "use_accurate":False})
+                was_original = True
+                Info("Secondary is Original")
+                bpy.ops.object.duplicate_move(
+                    OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, 
+                    TRANSFORM_OT_translate={
+                        "value":(0, 0, 0), 
+                        "orient_type":'GLOBAL', 
+                        "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), 
+                        "orient_matrix_type":'GLOBAL', 
+                        "constraint_axis":(False, False, False), 
+                        "mirror":True, 
+                        "use_proportional_edit":False, 
+                        "proportional_edit_falloff":'SMOOTH', 
+                        "proportional_size":1, 
+                        "use_proportional_connected":False, 
+                        "use_proportional_projected":False, 
+                        "snap":False, 
+                        "snap_target":'CLOSEST', 
+                        "snap_point":(0, 0, 0), 
+                        "snap_align":False, 
+                        "snap_normal":(0, 0, 0), 
+                        "gpencil_strokes":False, 
+                        "cursor_transform":False, 
+                        "texture_space":False, 
+                        "remove_on_cancel":False, 
+                        "release_confirm":False, 
+                        "use_accurate":False}
+                    )
                 copyObject = context.view_layer.objects.active
                 copyObject.name = originalObject.name + "Copy"
             copyVertices = copyObject.data.vertices
-            context.view_layer.objects.active = originalObject
+            context.view_layer.objects.active = modifyObject
 
             
             for modifier in copyObject.modifiers:
                 if modifier.type == 'ARMATURE':
                     modifier.show_viewport = False
 
-            for modifier in originalObject.modifiers:
+            for modifier in modifyObject.modifiers:
                 if modifier.type == 'ARMATURE':
                     modifier.show_viewport = True
                     Info(modifier)
@@ -215,10 +294,29 @@ class invert_armature(bpy.types.Operator):
                     baseStep = context.scene.invert_tool.step_size
                     progStep = baseStep
                     while progStep > context.scene.invert_tool.min_step_size:
-                        interpolate3(originalObject.name, copyObject.name, modifier.object.name, progStep)
+                        interpolate3(modifyObject.name, copyObject.name, modifier.object.name, progStep)
                         progStep /= 2
-                    interpolate3(originalObject.name, copyObject.name, modifier.object.name, context.scene.invert_tool.min_step_size)       
-            return{'FINISHED'}
+                    interpolate3(modifyObject.name, copyObject.name, modifier.object.name, context.scene.invert_tool.min_step_size)       
+            Info("FINISHED MODIFY STAGE")
+            for modifier in originalObject.modifiers:
+                if modifier.type == 'ARMATURE':
+                    modifier.show_viewport=False
+            for modifier in modifyObject.modifiers:
+                if modifier.type == 'ARMATURE':
+                    modifier.show_viewport=False
+            JoinAsShape(originalObject.name,modifyObject.name)
+            for modifier in originalObject.modifiers:
+                if modifier.type == 'ARMATURE':
+                    modifier.show_viewport=True
+            
+            bpy.ops.object.select_all(action='DESELECT')
+            modifyObject.select_set(True)
+            if not was_original:
+                copyObject.select_set(True)
+            context.view_layer.objects.active = modifyObject
+            bpy.ops.object.delete(use_global=False, confirm=False)
+
+        Info("FINISHED")
         return{'FINISHED'}
     
     

@@ -6,7 +6,7 @@ Armature inverter adjusts a mesh so that it's post pose shape matches it's base 
 ## How to use
 The armature inverter can be found in the Tools tab on the right sidebar.
 
-A reference object can be used, it must have the same vertex count as the target object.
+A reference object can be used, it must have the same vertex count and vertex order as the target object.
 
 The target object must have an Armature modifier.
 
