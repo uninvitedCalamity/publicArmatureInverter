@@ -123,6 +123,8 @@ class invert_armature(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):   
+        invert_tool = context.scene.invert_tool
+
         was_original:bool = False
         def Info(string):
             self.report({"INFO"},str(string))
@@ -152,19 +154,16 @@ class invert_armature(bpy.types.Operator):
                 return (returnable @ point.co)
             return False
 
-        originalObject = context.view_layer.objects.active
-        secondaryObject = context.view_layer.objects.active
-
-        selectedObjects = context.selected_objects
-        for object in selectedObjects:
-            Info(object.name)
-            if object == context.active_object:
-                Info("Primary = " + object.name)
-                originalObject = object
-            else:
-                Info("Secondary = " + object.name)
-                secondaryObject = object
-
+        #originalObject = context.view_layer.objects.active
+        #secondaryObject = context.view_layer.objects.active
+        ShapeName = ""
+        originalObject = bpy.data.objects[invert_tool.target_object]
+        if(originalObject.data.shape_keys != None):
+            ShapeName = originalObject.active_shape_key.name
+            Info(ShapeName)
+        copyObject = None
+        if invert_tool.reference_object != "":
+            copyObject = bpy.data.objects[invert_tool.reference_object]
 
         originalVertices = originalObject.data.vertices
         originalGroups = originalObject.vertex_groups
@@ -172,9 +171,59 @@ class invert_armature(bpy.types.Operator):
         for group in originalGroups:
             groupDictionary[group.index] = group.name
             
-        
+        if copyObject == originalObject or copyObject == None:
+            bpy.ops.object.select_all(action='DESELECT')
+            originalObject.select_set(True)
+            context.view_layer.objects.active = originalObject
+            was_original = True
+            Info("Making Copy")
+            bpy.ops.object.duplicate_move(
+                OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, 
+                TRANSFORM_OT_translate={
+                    "value":(0, 0, 0), 
+                    "orient_type":'GLOBAL', 
+                    "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), 
+                    "orient_matrix_type":'GLOBAL', 
+                    "constraint_axis":(False, False, False), 
+                    "mirror":True, 
+                    "use_proportional_edit":False, 
+                    "proportional_edit_falloff":'SMOOTH', 
+                    "proportional_size":1, 
+                    "use_proportional_connected":False, 
+                    "use_proportional_projected":False, 
+                    "snap":False, 
+                    "snap_target":'CLOSEST', 
+                    "snap_point":(0, 0, 0), 
+                    "snap_align":False, 
+                    "snap_normal":(0, 0, 0), 
+                    "gpencil_strokes":False, 
+                    "cursor_transform":False, 
+                    "texture_space":False, 
+                    "remove_on_cancel":False, 
+                    "release_confirm":False, 
+                    "use_accurate":False}
+                )
+            copyObject = context.view_layer.objects.active
+            copyObject.name = originalObject.name + "Copy"
+            #Add Conversion to active shape here
+            if(copyObject.data.shape_keys != None):
+                shapes_length = len(copyObject.data.shape_keys.key_blocks)
+                Info(shapes_length - 1)
+                shapes_iterator = shapes_length - 1
+
+                if shapes_length > 0:
+                    while shapes_iterator >= 0:
+                        copyObject.active_shape_key_index = shapes_iterator
+                        copyObject.data.shape_keys.key_blocks[shapes_iterator].lock_shape = False
+                        if copyObject.data.shape_keys.key_blocks[shapes_iterator].name != ShapeName:
+                            bpy.ops.object.shape_key_remove()
+                        shapes_iterator -= 1
+                    copyObject.shape_key_clear()
+        copyVertices = copyObject.data.vertices
         
         if(len(originalVertices) >= 1):
+            bpy.ops.object.select_all(action='DESELECT')
+            originalObject.select_set(True)
             context.view_layer.objects.active = originalObject
             bpy.ops.object.duplicate_move(
                 OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, 
@@ -203,8 +252,9 @@ class invert_armature(bpy.types.Operator):
                     "use_accurate":False}
                 )
             modifyObject = context.view_layer.objects.active
-            modifyObject.name= originalObject.name + "Modify"
-            Info(modifyObject.name)
+            modifyObject.name = originalObject.name + "Modify"
+            if was_original:
+                modifyObject.name = ShapeName + "_Modified"
             if(modifyObject.data.shape_keys != None):
                 shapes_length = len(modifyObject.data.shape_keys.key_blocks)
                 Info(shapes_length - 1)
@@ -216,39 +266,8 @@ class invert_armature(bpy.types.Operator):
                         shapes_iterator -= 1
                     modifyObject.shape_key_clear()
 
-            copyObject = secondaryObject
-            if secondaryObject == originalObject:
-                was_original = True
-                Info("Secondary is Original")
-                bpy.ops.object.duplicate_move(
-                    OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, 
-                    TRANSFORM_OT_translate={
-                        "value":(0, 0, 0), 
-                        "orient_type":'GLOBAL', 
-                        "orient_matrix":((1, 0, 0), (0, 1, 0), (0, 0, 1)), 
-                        "orient_matrix_type":'GLOBAL', 
-                        "constraint_axis":(False, False, False), 
-                        "mirror":True, 
-                        "use_proportional_edit":False, 
-                        "proportional_edit_falloff":'SMOOTH', 
-                        "proportional_size":1, 
-                        "use_proportional_connected":False, 
-                        "use_proportional_projected":False, 
-                        "snap":False, 
-                        "snap_target":'CLOSEST', 
-                        "snap_point":(0, 0, 0), 
-                        "snap_align":False, 
-                        "snap_normal":(0, 0, 0), 
-                        "gpencil_strokes":False, 
-                        "cursor_transform":False, 
-                        "texture_space":False, 
-                        "remove_on_cancel":False, 
-                        "release_confirm":False, 
-                        "use_accurate":False}
-                    )
-                copyObject = context.view_layer.objects.active
-                copyObject.name = originalObject.name + "Copy"
-            copyVertices = copyObject.data.vertices
+
+
             context.view_layer.objects.active = modifyObject
 
             
@@ -311,7 +330,7 @@ class invert_armature(bpy.types.Operator):
             
             bpy.ops.object.select_all(action='DESELECT')
             modifyObject.select_set(True)
-            if not was_original:
+            if was_original:
                 copyObject.select_set(True)
             context.view_layer.objects.active = modifyObject
             bpy.ops.object.delete(use_global=False, confirm=False)
@@ -321,10 +340,25 @@ class invert_armature(bpy.types.Operator):
     
     
 class properties(bpy.types.PropertyGroup):
+    target_object : bpy.props.StringProperty(name= "Target Object", description="Name of Target Object", default="")
+    reference_object : bpy.props.StringProperty(name= "Reference Object", description="Name of Reference Object", default="")
     step_size : bpy.props.FloatProperty(name= "Max step size", soft_min= 0.000001, default=1)
     min_step_size : bpy.props.FloatProperty(name= "Min step size", soft_min= 0.000001, default=1)
     localise : bpy.props.BoolProperty(name= "localise")
     
+#Object picker based on the object picker from bartoszstyperek's shape transfer tool (https://bartoszstyperek.gumroad.com/)
+class ST_OT_ObjectPicker(bpy.types.Operator):
+    bl_idname = "object.objectpicker_invert_armature"
+    bl_label = "Pick Obj"
+
+    targetPropName:  bpy.props.StringProperty()
+
+    def execute(self, context):
+        invert_tool = context.scene.invert_tool
+        if context.active_object:
+            invert_tool[self.targetPropName]=context.active_object.name
+        return {'FINISHED'}
+
 #Based on https://github.com/CGArtPython/blender_plus_python/blob/main/add-ons/simple_custom_panel/simple_custom_panel.py
 class VIEW3D_PT_invert_armature_panel(bpy.types.Panel):
     bl_space_type = "VIEW_3D" 
@@ -338,15 +372,27 @@ class VIEW3D_PT_invert_armature_panel(bpy.types.Panel):
         layout = self.layout
         scene = context.scene
         invertTool = scene.invert_tool
-        layout.prop(invertTool, "step_size")
-        layout.prop(invertTool, "min_step_size")
-        layout.prop(invertTool, "localise")
+        col = layout.column(align=False)
+        row = col.row(align=True)
+        row.prop_search(invertTool, 'target_object', context.scene, 'objects')
+        oper = row.operator("object.objectpicker_invert_armature", text="", icon="EYEDROPPER")
+        oper.targetPropName = 'target_object'
+        row = col.row(align=True)
+        row.prop_search(invertTool, 'reference_object', context.scene, 'objects')
+        oper = row.operator("object.objectpicker_invert_armature", text="", icon="EYEDROPPER")
+        oper.targetPropName = 'reference_object'
+        row = col.row(align=True)
+        row.prop(invertTool, "step_size")
+        row = col.row(align=True)
+        row.prop(invertTool, "min_step_size")
+        row = col.row(align=True)
+        row.prop(invertTool, "localise")
         
         row = self.layout.row()
         row.operator("object.invert_armature", text="Invert Armature")
 
 
-classes = [properties, VIEW3D_PT_invert_armature_panel, invert_armature]
+classes = [properties, VIEW3D_PT_invert_armature_panel, invert_armature, ST_OT_ObjectPicker]
 
 def menu_func(self, context):
     self.layout.operator(invert_armature.bl_idname)

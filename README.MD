@@ -1,6 +1,6 @@
 # Armature inverter
 ## What it does
-Armature inverter is built for blender 3.6.
+Armature inverter is built for blender 4.5.
 Armature inverter adjusts a mesh so that it's post pose shape matches it's base shape.
 
 ## How to use
@@ -13,11 +13,15 @@ The target object must have an Armature modifier.
 ### Operation
 - Pose the armature in the desired target pose.
 - Select reference object (if using a reference object)
+- Click dropper next to Reference Object
 - Select target object
+    - If you're not using a reference Object, make sure to select the Base shape key you want to invert (if your mesh has shapekeys)
+- Click dropper next to Target Object
 - Set maximum step size
 - Set minimum step size
-- Enable/Disable localisation
+- Enable/Disable localisation (this is supposed to make it a bit quicker, but I'm not sure that it does, also sometimes has errors)
 - Click invert armature
+- Armature inverted shape will be added to target object as a new shapekey
 
 ## How it works
 
