@@ -20,6 +20,8 @@ The target object must have an Armature modifier.
 - Set maximum step size
 - Set minimum step size
 - Enable/Disable localisation (this is supposed to make it a bit quicker, but I'm not sure that it does, also sometimes has errors)
+- Enable / disable subtrack_mix
+	- If you have a referenceobject, this will make the new shape additive to the target object's current active shape_keys
 - Click invert armature
 - Armature inverted shape will be added to target object as a new shapekey
 
